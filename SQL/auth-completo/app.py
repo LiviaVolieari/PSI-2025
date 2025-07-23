@@ -1,22 +1,26 @@
 from flask import Flask, render_template
-from flask import request, session, redirect, url_for
+from flask import request, redirect, url_for
 from flask import flash
 
 from flask_login import LoginManager, UserMixin, logout_user
 from flask_login import login_required, login_user
 
-import sqlite3 
+from werkzeug.security import check_password_hash
+from werkzeug.security import generate_password_hash
+
+
+import sqlite3
 
 login_manager = LoginManager()
-
 app = Flask(__name__)
 
 login_manager.__init__(app)
 
 app.secret_key = 'chave_secreta'
 
+
 def obter_conexao():
-    conn = sqlite3.connect ("banco.db")
+    conn = sqlite3.connect('banco.db')
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -27,12 +31,18 @@ class User(UserMixin):
 
     @classmethod
     def get(cls, user_id):
-        #user_id nesse caso é um nome
         conexao = obter_conexao()
-        sql = "select * from users where nome = ?"
+        sql = "SELECT * FROM users WHERE nome = ?"
         resultado = conexao.execute(sql, (user_id,)).fetchone()
+        conexao.close()
+
+        if resultado is None:
+            return None
+
         user = User(nome=resultado['nome'], senha=resultado['senha'])
+        user.id = resultado['nome']
         return user
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -40,65 +50,63 @@ def load_user(user_id):
 
 @app.route('/')
 def index():
-
     return render_template('index.html')
 
 @app.route('/login', methods=['POST', 'GET'])
 def login():
     if request.method == 'POST':
         nome = request.form['name']
-        senha= request.form['password']
-        
-        lista_usuarios = session['usuarios']
+        senha = request.form['password']
 
-        print(lista_usuarios)
+        conexao = obter_conexao()
+        sql = "SELECT * FROM users WHERE nome = ?"
+        resultado = conexao.execute(sql, (nome,)).fetchone()
 
-        for id, dados in lista_usuarios.items():
-            if nome == dados['nome'] and senha == dados['senha']:
-                user = User(nome=nome, senha=dados['senha'])
-                user.id = id
+        if resultado:
+            hash = resultado['senha']
+            if check_password_hash(hash, senha):
+                user = User(nome=resultado['nome'], senha=hash)
+                user.id = resultado['nome']
                 login_user(user)
                 return redirect(url_for('dash'))
 
-        flash('Dados incorretos', category='error')
+        flash('Dados incorretos', category='error') 
         return redirect(url_for('login'))
 
     return render_template('login.html')
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
 
     if request.method == 'POST':
         nome = request.form['name']
-        senha = request.form['password']
-
-        user = User(nome=nome, senha=senha)
-
-        # obter uma conexão
-
-        # conn = sqlite3.connect ("banco.db")
-        # conn.row_factory = sqlite3.Row
-
-        conexao = obter_conexao()
-
+        senha= request.form['password']
+    
+        conexao = obter_conexao()        
         sql = "select * from users where nome = ?"
         resultado = conexao.execute(sql, (nome,)).fetchone()
-
+        # none
         if not resultado:
-            sql = "INSERT INTO users (nome, senha) VALUES(?,?)"
-            conexao.execute(sql, (nome, senha))
-            conexao.commit()
+            # realização do cadastro
+            hash = generate_password_hash(senha)
+            sql = "INSERT INTO users(nome, senha) VALUES(?,?)"
+            conexao.execute(sql, (nome, hash))
+            conexao.commit() 
 
-            #definir o usuário para logar
+            # definir o usuário para logar
             user = User(nome=nome, senha=senha)
             user.id = nome
 
-            flash('cadastro realizado com sucesso', category= 'error')
-            return redirect(url_for('login'))
-        # login_user(user)
+            login_user(user)
+
+            # flash('Cadastro realizado com sucesso!', category='error')
+            return redirect(url_for('dash'))
+
         conexao.close()
-        flash('Problema no cadastro')
-        return redirect(url_for('dash'))
+        
+        flash('Problema no cadastro', category='error')
+        return redirect(url_for('register'))
 
     return render_template('register.html')
 

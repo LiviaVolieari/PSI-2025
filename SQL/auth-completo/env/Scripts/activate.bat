@@ -8,7 +8,7 @@ if defined _OLD_CODEPAGE (
     "%SystemRoot%\System32\chcp.com" 65001 > nul
 )
 
-set VIRTUAL_ENV=C:\Users\20231101110056\Documents\Materias Tecnicas - 3 ano\PSI\2° Bimestre\SQL\auth-completo\env
+set VIRTUAL_ENV=C:\Users\20231101110056\Documents\Materias Tecnicas - 3 ano\PSI\2° Bimestre\PSI-2025\SQL\auth-completo\env
 
 if not defined PROMPT set PROMPT=$P$G
 
